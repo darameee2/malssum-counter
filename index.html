@@ -160,13 +160,27 @@
   .card.compact{padding:12px 10px 12px 14px}
   .card.compact .card-title{font-size:15px}
   .card.leaving{opacity:0;transform:scale(.95);pointer-events:none;transition:opacity .22s, transform .22s}
-  .card.dragging{
-    position:relative;z-index:6;opacity:.97;
-    border-color:var(--accent);
-    box-shadow:0 14px 30px rgba(0,0,0,.34);
+  .card.drag-fixed{
+    position:fixed;left:0;top:0;margin:0;
+    z-index:60;pointer-events:none;
+    transform-origin:center center;
+    will-change:transform;
   }
-  body.is-dragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
-  body.is-dragging .card{transition:none}
+  .card.dragging{
+    opacity:.98;
+    border-color:var(--accent);
+    box-shadow:0 20px 44px rgba(0,0,0,.42), 0 4px 12px rgba(0,0,0,.2);
+  }
+  html[data-theme="light"] .card.dragging{
+    box-shadow:0 18px 38px rgba(96,76,44,.22), 0 4px 12px rgba(96,76,44,.12);
+  }
+  .drag-ph{
+    flex:none;border-radius:20px;
+    border:1.5px dashed var(--line);
+    background:rgba(148,161,177,.06);
+    transition:border-color .2s ease, background .2s ease;
+  }
+  body.is-dragging{-webkit-user-select:none;user-select:none;cursor:grabbing;overflow-anchor:none}
   .card-main:active .card-title{opacity:.7}
   .idx{
     flex:none;width:23px;height:23px;border-radius:50%;
@@ -997,8 +1011,11 @@
 
   /* ---------- 드래그로 순서 바꾸기 ---------- */
   var drag = null;
+  var DRAG_START = 5;
 
   function onHandleDown(e) {
+    if (drag) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     var handle = e.target.closest ? e.target.closest('.drag-handle') : null;
     if (!handle) return;
     var card = handle.closest('.card');
@@ -1010,7 +1027,12 @@
       startY: e.clientY,
       lastY: e.clientY,
       active: false,
-      timer: null
+      timer: null,
+      ph: null,
+      grabOffset: 0,
+      baseTop: 0,
+      height: 0,
+      scaleComp: 0
     };
     try { handle.setPointerCapture(e.pointerId); } catch (err) {}
     document.addEventListener('pointermove', onDragMove, { passive: false });
@@ -1018,42 +1040,136 @@
     document.addEventListener('pointercancel', onDragEnd);
   }
 
+  // 잡은 카드를 화면 위로 띄우고, 제자리에는 빈자리(자리표시자)를 남긴다
+  function liftCard() {
+    var el = drag.el;
+    var r = el.getBoundingClientRect();
+    drag.grabOffset = drag.startY - r.top;
+    drag.baseTop = r.top;
+    drag.height = r.height;
+    drag.scaleComp = r.height * 0.01; // scale(1.02)로 위쪽이 커지는 만큼 보정
+
+    var ph = document.createElement('div');
+    ph.className = 'drag-ph';
+    ph.style.height = r.height + 'px';
+    el.parentNode.insertBefore(ph, el);
+    drag.ph = ph;
+
+    el.style.left = r.left + 'px';
+    el.style.top = r.top + 'px';
+    el.style.width = r.width + 'px';
+    el.style.transform = 'translate3d(0,' + drag.scaleComp + 'px,0) scale(1.02)';
+    el.classList.add('drag-fixed');
+    el.classList.add('dragging');
+    document.body.classList.add('is-dragging');
+  }
+
   function onDragMove(e) {
     if (!drag) return;
     var y = e.clientY;
     drag.lastY = y;
     if (!drag.active) {
-      if (Math.abs(y - drag.startY) < 5) return;
+      if (Math.abs(y - drag.startY) < DRAG_START) return;
       drag.active = true;
-      drag.el.classList.add('dragging');
-      document.body.classList.add('is-dragging');
+      liftCard();
       buzz(8);
       drag.timer = setInterval(function () {
         if (drag && drag.active) autoScroll(drag.lastY);
       }, 60);
     }
     e.preventDefault();
-    positionDrag(y);
+    // 손가락/커서 움직임을 1:1로 따라간다
+    var ty = y - drag.startY + drag.scaleComp;
+    drag.el.style.transform = 'translate3d(0,' + ty + 'px,0) scale(1.02)';
+    maybeMovePlaceholder(y - drag.grabOffset + drag.height / 2);
     autoScroll(y);
   }
 
-  function positionDrag(y) {
-    var list = $('#list');
-    if (!list) return;
-    var cards = Array.prototype.slice.call(list.querySelectorAll('.card')).filter(function (c) {
+  function translateYOf(el) {
+    var tr = window.getComputedStyle(el).transform;
+    if (!tr || tr === 'none') return 0;
+    if (tr.indexOf('matrix3d') === 0) {
+      var p3 = tr.slice(9, -1).split(',');
+      return parseFloat(p3[13]) || 0;
+    }
+    if (tr.indexOf('matrix') === 0) {
+      var p = tr.slice(7, -1).split(',');
+      return parseFloat(p[5]) || 0;
+    }
+    return 0;
+  }
+
+  // 적용 중인 transform을 뺀 레이아웃상의 위치
+  function layoutTop(el) {
+    return el.getBoundingClientRect().top - translateYOf(el);
+  }
+
+  function listCards() {
+    if (!drag || !drag.ph || !drag.ph.parentNode) return [];
+    return Array.prototype.slice.call(drag.ph.parentNode.querySelectorAll('.card')).filter(function (c) {
       return c !== drag.el;
     });
+  }
+
+  // 자리가 바뀌는 카드들을 FLIP으로 스르륵 밀어 준다
+  function shiftCards(move) {
+    var list = drag.ph.parentNode;
+    var cards = listCards();
     if (!cards.length) return;
-    var ref = null;
+    var before = cards.map(function (c) { return c.getBoundingClientRect().top; });
+    move();
+    var after = cards.map(function (c) { return c.getBoundingClientRect().top; });
+    var anim = [];
+    cards.forEach(function (c, i) {
+      var d = before[i] - after[i];
+      var t = translateYOf(c);
+      var start = d + t;
+      clearTimeout(c._shiftTimer);
+      if (Math.abs(start) < 0.5) return;
+      c.style.transition = 'none';
+      c.style.transform = 'translate3d(0,' + start + 'px,0)';
+      anim.push(c);
+    });
+    if (!anim.length) return;
+    void list.offsetHeight; // 강제 리플로우로 시작 위치 고정
+    anim.forEach(function (c) {
+      c.style.transition = 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)';
+      c.style.transform = 'translate3d(0,0,0)';
+      c._shiftTimer = setTimeout(function () {
+        c.style.transition = '';
+        c.style.transform = '';
+      }, 260);
+    });
+  }
+
+  function indexOfPlaceholder(ph) {
+    var cur = 0;
+    var n = ph.parentNode.firstElementChild;
+    while (n && n !== ph) {
+      if (n.classList.contains('card') && n !== drag.el) cur++;
+      n = n.nextElementSibling;
+    }
+    return cur;
+  }
+
+  function maybeMovePlaceholder(desiredCenter) {
+    if (!drag || !drag.ph || !drag.ph.parentNode) return;
+    var list = drag.ph.parentNode;
+    var cards = listCards();
+    if (!cards.length) return;
+    var ph = drag.ph;
+    var idx = cards.length;
     for (var i = 0; i < cards.length; i++) {
-      var r = cards[i].getBoundingClientRect();
-      if (y < r.top + r.height / 2 - 3) { ref = cards[i]; break; }
+      if (desiredCenter < layoutTop(cards[i]) + cards[i].offsetHeight / 2) {
+        idx = i;
+        break;
+      }
     }
-    if (ref) {
-      if (ref.previousElementSibling !== drag.el) list.insertBefore(drag.el, ref);
-    } else if (list.lastElementChild !== drag.el) {
-      list.appendChild(drag.el);
-    }
+    if (indexOfPlaceholder(ph) === idx) return;
+    shiftCards(function () {
+      if (idx >= cards.length) list.appendChild(ph);
+      else list.insertBefore(ph, cards[idx]);
+    });
   }
 
   function autoScroll(y) {
@@ -1073,9 +1189,52 @@
     var d = drag;
     drag = null;
     clearInterval(d.timer);
-    d.el.classList.remove('dragging');
+    if (!d.active) {
+      document.body.classList.remove('is-dragging');
+      return;
+    }
+    settleCard(d);
+  }
+
+  // 손을 떼면 새 자리로 스르륵 안착한 뒤 순서를 확정한다
+  function settleCard(d) {
+    var el = d.el;
+    var ph = d.ph;
+    if (!ph || !ph.parentNode) { finishDrop(d); return; }
+    var pr = ph.getBoundingClientRect();
+    var targetTy = pr.top - d.baseTop;
+    el.style.transition = 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease, border-color 200ms ease, opacity 200ms ease';
+    el.style.transform = 'translate3d(0,' + targetTy + 'px,0) scale(1)';
+    el.classList.remove('dragging');
+    var done = false;
+    function onEnd(ev) {
+      if (ev.target === el) finish();
+    }
+    function finish() {
+      if (done) return;
+      done = true;
+      el.removeEventListener('transitionend', onEnd);
+      finishDrop(d);
+    }
+    el.addEventListener('transitionend', onEnd);
+    setTimeout(finish, 240);
+  }
+
+  function finishDrop(d) {
+    var el = d.el;
+    var ph = d.ph;
+    if (ph && ph.parentNode) {
+      ph.parentNode.insertBefore(el, ph);
+      ph.parentNode.removeChild(ph);
+    }
+    el.classList.remove('drag-fixed');
+    el.classList.remove('dragging');
+    el.style.left = '';
+    el.style.top = '';
+    el.style.width = '';
+    el.style.transform = '';
+    el.style.transition = '';
     document.body.classList.remove('is-dragging');
-    if (!d.active) return;
     commitOrder();
     buzz(10);
   }
