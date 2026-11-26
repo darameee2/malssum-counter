@@ -25,9 +25,12 @@ if [ ! -d .git ]; then git init -q; git branch -M main; fi
 git add -A
 git -c user.name="$OWNER" -c user.email="$OWNER@users.noreply.github.com" commit -q -m "말씀 상고 10회 카운트 웹앱 배포" || echo "   (변경 없음)"
 git push -f "https://github.com/$REPO.git" HEAD:main
+# 이 GitHub 연결(GitHub App)은 Pages 설정 권한이 없어 API로 소스를 바꿀 수 없다.
+# gh-pages 브랜치를 푸시하면 GitHub이 그 브랜치를 Pages 소스로 자동 배포한다(실제 라이브 소스).
+git push -f "https://github.com/$REPO.git" HEAD:gh-pages
 
-echo "== 3. GitHub Pages 활성화 (branch main, path /)"
-gh api -X POST "repos/$REPO/pages" -f "source[branch]=main" -f "source[path]=/" >/dev/null 2>&1 \
+echo "== 3. GitHub Pages 활성화 (branch gh-pages, path /)"
+gh api -X POST "repos/$REPO/pages" -f "source[branch]=gh-pages" -f "source[path]=/" >/dev/null 2>&1 \
   && echo "   활성화 요청 완료" \
   || gh api "repos/$REPO/pages" -q '.html_url' 2>/dev/null || echo "   Pages 활성화 실패(권한 확인 필요)"
 
