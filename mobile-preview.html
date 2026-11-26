@@ -12,7 +12,16 @@
 </head>
 <body>
 <div class="wrap"><div class="phone">
-<iframe id="f" src="https://htmlpreview.github.io/?https://raw.githubusercontent.com/darameee2/malssum-counter/main/index.html"></iframe>
+<iframe id="f"></iframe>
 </div></div>
+<script>
+(function () {
+  var SRC = 'https://raw.githubusercontent.com/darameee2/malssum-counter/99f29e8a2341954cd8008b199586ca9a9bca618d/index.html';
+  fetch(SRC, { cache: 'no-store' })
+    .then(function (r) { return r.text(); })
+    .then(function (t) { document.getElementById('f').srcdoc = t; })
+    .catch(function (e) { document.body.insertAdjacentHTML('beforeend', '<pre>' + e + '</pre>'); });
+})();
+</script>
 </body>
 </html>
