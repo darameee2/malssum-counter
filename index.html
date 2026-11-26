@@ -300,8 +300,8 @@
   .acc-peek.filled{color:var(--text);opacity:.7}
   .acc-caret{flex:none;font-size:11px;color:var(--muted);transition:transform .22s;line-height:1}
   .acc.open .acc-caret{transform:rotate(180deg)}
-  .acc-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .24s ease}
-  .acc.open .acc-body{grid-template-rows:1fr}
+  .acc-body{display:grid;grid-template-rows:0fr;visibility:hidden;transition:grid-template-rows .24s ease, visibility 0s linear .24s}
+  .acc.open .acc-body{grid-template-rows:1fr;visibility:visible;transition:grid-template-rows .24s ease, visibility 0s}
   .acc-inner{overflow:hidden}
   .acc textarea{
     width:100%;min-height:132px;display:block;
@@ -507,6 +507,7 @@
   var state = null;
   var view = { name: 'list', id: null };
   var acc = { core: false, insight: false };
+  var sheetSeq = 0;
   var pendingResolve = null;
   var saveTimer = null;
   var savedTimer = null;
@@ -1112,6 +1113,7 @@
     var toastRoot = $('#toastRoot');
     if (toastRoot) toastRoot.innerHTML = '';
     var sheet = $('#sheet');
+    sheetSeq++;
     sheet.innerHTML = html;
     sheet.onclick = null;
     var ov = $('#overlay');
@@ -1123,6 +1125,11 @@
     var ov = $('#overlay');
     ov.classList.remove('show');
     ov.setAttribute('aria-hidden', 'true');
+    // 닫는 애니메이션이 끝난 뒤 내용을 비운다(그새 새 시트가 열렸으면 그대로 둔다)
+    var seq = sheetSeq;
+    setTimeout(function () {
+      if (seq === sheetSeq && !ov.classList.contains('show')) $('#sheet').innerHTML = '';
+    }, 300);
     if (pendingResolve) {
       var r = pendingResolve;
       pendingResolve = null;
