@@ -114,6 +114,22 @@
   }
   .summary b{color:var(--text);font-weight:700}
 
+  /* seg: 진행중 / 완료 */
+  .seg{display:flex;gap:6px;padding:8px 0 2px}
+  .seg-btn{
+    flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;
+    padding:9px 10px;border-radius:13px;border:1px solid var(--line);
+    background:transparent;color:var(--muted);font-size:13.5px;font-weight:700;
+    transition:.15s;
+  }
+  .seg-btn:active{transform:scale(.98)}
+  .seg-btn.active{background:var(--card-2);border-color:var(--line);color:var(--text);font-weight:800}
+  .seg-n{
+    font-size:11.5px;font-weight:800;font-variant-numeric:tabular-nums;
+    background:var(--line);color:var(--text);border-radius:999px;padding:1px 7px;line-height:1.5;
+  }
+  .seg-btn.active .seg-n{background:var(--accent);color:var(--accent-ink)}
+
   /* list */
   .list{display:flex;flex-direction:column;gap:12px;padding:10px 16px 0}
   .card{
@@ -127,10 +143,30 @@
   html[data-theme="light"] .card.done{border-color:rgba(47,143,102,.45);background:linear-gradient(180deg,rgba(47,143,102,.06),transparent 60%),var(--card)}
   .card.new{animation:cardIn .45s cubic-bezier(.2,.9,.3,1)}
   @keyframes cardIn{from{opacity:0;transform:translateY(-6px) scale(.985)}to{opacity:1;transform:none}}
+  .card-top{display:flex;align-items:center;gap:4px}
   .card-main{
-    display:flex;align-items:center;gap:10px;width:100%;
+    flex:1;min-width:0;
+    display:flex;align-items:center;gap:10px;
     background:none;border:0;padding:0;color:inherit;text-align:left;
   }
+  .drag-handle{
+    flex:none;width:32px;height:40px;border:0;border-radius:10px;
+    background:transparent;color:var(--muted);opacity:.5;
+    display:flex;align-items:center;justify-content:center;
+    touch-action:none;cursor:grab;transition:opacity .15s, background .15s, transform .1s;
+  }
+  .drag-handle:active{opacity:1;background:var(--card-2);transform:scale(.94)}
+  .drag-handle svg{width:15px;height:15px;display:block}
+  .card.compact{padding:12px 10px 12px 14px}
+  .card.compact .card-title{font-size:15px}
+  .card.leaving{opacity:0;transform:scale(.95);pointer-events:none;transition:opacity .22s, transform .22s}
+  .card.dragging{
+    position:relative;z-index:6;opacity:.97;
+    border-color:var(--accent);
+    box-shadow:0 14px 30px rgba(0,0,0,.34);
+  }
+  body.is-dragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
+  body.is-dragging .card{transition:none}
   .card-main:active .card-title{opacity:.7}
   .idx{
     flex:none;width:23px;height:23px;border-radius:50%;
@@ -243,17 +279,39 @@
     margin:14px 0 0;text-align:center;font-size:12.5px;color:var(--muted);line-height:1.5;
   }
   .progress-card.done .progress-hint{color:var(--done);font-weight:700}
-  .field{margin-top:20px}
-  .field label{display:block;font-size:13px;font-weight:800;color:var(--muted);margin:0 0 8px 4px;letter-spacing:.02em}
-  .field textarea{
-    width:100%;min-height:132px;
-    background:var(--card);border:1px solid var(--line);border-radius:16px;
+  /* 접었다 펴는 입력 칸 (핵심내용 / 깨달은 거) */
+  .acc{
+    margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:16px;
+    overflow:hidden;transition:border-color .18s;
+  }
+  .acc.open{border-color:var(--accent)}
+  .acc-head{
+    display:flex;align-items:center;gap:10px;width:100%;
+    background:none;border:0;padding:15px 14px;min-height:52px;
+    color:inherit;text-align:left;
+  }
+  .acc-head:active{background:var(--card-2)}
+  .acc-label{flex:none;font-size:13px;font-weight:800;color:var(--muted);letter-spacing:.02em}
+  .acc.open .acc-label{color:var(--accent)}
+  .acc-peek{
+    flex:1;min-width:0;font-size:13px;color:var(--muted);opacity:.8;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;
+  }
+  .acc-peek.filled{color:var(--text);opacity:.7}
+  .acc-caret{flex:none;font-size:11px;color:var(--muted);transition:transform .22s;line-height:1}
+  .acc.open .acc-caret{transform:rotate(180deg)}
+  .acc-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .24s ease}
+  .acc.open .acc-body{grid-template-rows:1fr}
+  .acc-inner{overflow:hidden}
+  .acc textarea{
+    width:100%;min-height:132px;display:block;
+    background:var(--card);border:0;border-top:1px solid var(--line);border-radius:0;
     padding:14px;color:var(--text);font-size:16px;line-height:1.7;
     resize:none;outline:none;overflow:hidden;
-    transition:border-color .15s, background .15s;
+    transition:background .15s;
   }
-  .field textarea::placeholder{color:var(--muted);opacity:.75}
-  .field textarea:focus{border-color:var(--accent);background:var(--card-2)}
+  .acc textarea::placeholder{color:var(--muted);opacity:.75}
+  .acc textarea:focus{background:var(--card-2)}
   .saved-hint{
     text-align:center;font-size:12px;color:var(--muted);
     margin:18px 0 0;opacity:.7;transition:color .2s, opacity .2s;
@@ -360,6 +418,7 @@
         </div>
       </div>
       <nav class="tabs" id="tabs" aria-label="카테고리"></nav>
+      <div class="seg" id="seg" role="group" aria-label="진행 상태"></div>
       <div class="summary" id="summary"></div>
     </div>
     <div class="list" id="list"></div>
@@ -400,13 +459,29 @@
         <p class="progress-hint" id="detailHint"></p>
       </div>
 
-      <div class="field">
-        <label for="coreInput">핵심내용</label>
-        <textarea id="coreInput" data-field="core" placeholder="이 말씀의 핵심을 적어 두세요" spellcheck="false"></textarea>
+      <div class="acc" data-acc="core">
+        <button class="acc-head" type="button" data-action="acc" data-acc="core" aria-expanded="false" aria-controls="coreBody">
+          <span class="acc-label">핵심내용</span>
+          <span class="acc-peek" data-peek="core"></span>
+          <span class="acc-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="acc-body" id="coreBody">
+          <div class="acc-inner">
+            <textarea id="coreInput" data-field="core" placeholder="이 말씀의 핵심을 적어 두세요" spellcheck="false"></textarea>
+          </div>
+        </div>
       </div>
-      <div class="field">
-        <label for="insightInput">깨달은 거</label>
-        <textarea id="insightInput" data-field="insight" placeholder="오늘 마음에 남은 것, 삶에 적용할 점" spellcheck="false"></textarea>
+      <div class="acc" data-acc="insight">
+        <button class="acc-head" type="button" data-action="acc" data-acc="insight" aria-expanded="false" aria-controls="insightBody">
+          <span class="acc-label">깨달은 거</span>
+          <span class="acc-peek" data-peek="insight"></span>
+          <span class="acc-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="acc-body" id="insightBody">
+          <div class="acc-inner">
+            <textarea id="insightInput" data-field="insight" placeholder="오늘 마음에 남은 것, 삶에 적용할 점" spellcheck="false"></textarea>
+          </div>
+        </div>
       </div>
       <p class="saved-hint" id="savedHint">입력하면 자동으로 저장돼요</p>
     </div>
@@ -431,6 +506,7 @@
   var TOTAL = 10;
   var state = null;
   var view = { name: 'list', id: null };
+  var acc = { core: false, insight: false };
   var pendingResolve = null;
   var saveTimer = null;
   var savedTimer = null;
@@ -464,7 +540,7 @@
   function defaultState() {
     var c1 = { id: uid(), name: '주일말씀', items: [] };
     var c2 = { id: uid(), name: '새벽말씀', items: [] };
-    return { version: 1, theme: 'dark', activeCategoryId: c1.id, categories: [c1, c2] };
+    return { version: 1, theme: 'dark', seg: 'todo', activeCategoryId: c1.id, categories: [c1, c2] };
   }
 
   function normalize(raw) {
@@ -498,6 +574,7 @@
     return {
       version: 1,
       theme: raw.theme === 'light' ? 'light' : 'dark',
+      seg: raw.seg === 'done' ? 'done' : 'todo',
       activeCategoryId: exists ? activeId : cats[0].id,
       categories: cats
     };
@@ -574,8 +651,48 @@
   /* ---------- 렌더 ---------- */
   function renderAll() {
     renderTabs();
+    renderSeg();
     renderSummary();
     renderList();
+  }
+
+  function isDone(it) { return it.count >= TOTAL; }
+
+  function splitItems(cat) {
+    var todo = [], done = [];
+    cat.items.forEach(function (it) { (isDone(it) ? done : todo).push(it); });
+    return { todo: todo, done: done };
+  }
+
+  function currentItems() {
+    var s = splitItems(activeCategory());
+    return state.seg === 'done' ? s.done : s.todo;
+  }
+
+  function renderSeg() {
+    var el = $('#seg');
+    if (!el) return;
+    var cat = activeCategory();
+    if (!cat.items.length) { el.innerHTML = ''; el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    var s = splitItems(cat);
+    var todoOn = state.seg !== 'done';
+    el.innerHTML =
+      '<button class="seg-btn' + (todoOn ? ' active' : '') + '" data-action="seg" data-seg="todo"' +
+        ' aria-pressed="' + (todoOn ? 'true' : 'false') + '">진행중' +
+        ' <span class="seg-n">' + s.todo.length + '</span></button>' +
+      '<button class="seg-btn' + (!todoOn ? ' active' : '') + '" data-action="seg" data-seg="done"' +
+        ' aria-pressed="' + (!todoOn ? 'true' : 'false') + '">완료' +
+        ' <span class="seg-n">' + s.done.length + '</span></button>';
+  }
+
+  function setSeg(seg) {
+    state.seg = seg === 'done' ? 'done' : 'todo';
+    save();
+    renderSeg();
+    renderSummary();
+    renderList();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function renderTabs() {
@@ -595,14 +712,19 @@
 
   function renderSummary() {
     var cat = activeCategory();
-    var done = cat.items.filter(function (i) { return i.count >= TOTAL; }).length;
     var el = $('#summary');
     if (!cat.items.length) {
       el.innerHTML = '<span>탭을 한 번 더 누르면 <b>이름 바꾸기·삭제</b>를 할 수 있어요</span>';
       return;
     }
+    var s = splitItems(cat);
+    if (state.seg === 'done') {
+      el.innerHTML = '<span><b>' + esc(cat.name) + '</b> · 완료 <b>' + s.done.length +
+        '</b>개 · 10개를 모두 채우면 이곳으로 옮겨져요</span>';
+      return;
+    }
     el.innerHTML = '<span><b>' + esc(cat.name) + '</b> · 말씀 ' + cat.items.length +
-      '개 · 10회 완료 <b>' + done + '</b>개</span>';
+      '개 · 진행중 <b>' + s.todo.length + '</b> · 완료 <b>' + s.done.length + '</b></span>';
   }
 
   function dotsHTML(count, popAt) {
@@ -624,15 +746,24 @@
   }
 
   function cardHTML(it, idx) {
-    var done = it.count >= TOTAL;
-    return '<article class="card' + (done ? ' done' : '') + '" data-id="' + esc(it.id) + '">' +
-      '<button class="card-main" data-action="open" data-id="' + esc(it.id) + '">' +
-        '<span class="idx">' + (idx + 1) + '</span>' +
-        '<span class="card-title">' + esc(it.title) + '</span>' +
-        badgeHTML(it) +
-        '<span class="caret" aria-hidden="true">›</span>' +
-      '</button>' +
-      '<div class="dots" data-dots>' + dotsHTML(it.count) + '</div>' +
+    var done = isDone(it);
+    var handle = '<button class="drag-handle" data-drag="1" aria-label="잡고 위아래로 옮겨 순서 바꾸기" title="잡고 위아래로 옮기기">' +
+      '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+        '<circle cx="9" cy="5.5" r="1.7"/><circle cx="15" cy="5.5" r="1.7"/>' +
+        '<circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/>' +
+        '<circle cx="9" cy="18.5" r="1.7"/><circle cx="15" cy="18.5" r="1.7"/>' +
+      '</svg></button>';
+    return '<article class="card' + (done ? ' done compact' : '') + '" data-id="' + esc(it.id) + '">' +
+      '<div class="card-top">' +
+        '<button class="card-main" data-action="open" data-id="' + esc(it.id) + '">' +
+          '<span class="idx">' + (idx + 1) + '</span>' +
+          '<span class="card-title">' + esc(it.title) + '</span>' +
+          badgeHTML(it) +
+          '<span class="caret" aria-hidden="true">›</span>' +
+        '</button>' +
+        handle +
+      '</div>' +
+      (done ? '' : '<div class="dots" data-dots>' + dotsHTML(it.count) + '</div>') +
     '</article>';
   }
 
@@ -646,7 +777,29 @@
       '· 상단 탭을 눌러 카테고리를 바꾸고, <b>＋</b>로 새 카테고리를 만들어요.<br>' +
       '· 탭을 한 번 더 누르면 이름 바꾸기·삭제를 할 수 있어요.<br>' +
       '· 동그라미를 터치할 때마다 한 번씩 채워지고, 다시 누르면 취소돼요.<br>' +
+      '· 10개를 다 채우면 <b>완료</b>로 옮겨져요.<br>' +
+      '· 카드 오른쪽 <b>⋮⋮</b>를 잡고 위아래로 옮기면 순서를 바꿀 수 있어요.<br>' +
       '· 제목을 누르면 핵심내용·깨달은 거를 적는 화면으로 넘어가요.</div>' +
+    '</div>';
+  }
+
+  function emptyDoneHTML() {
+    return '<div class="empty">' +
+      '<div class="empty-mark">✓</div>' +
+      '<h2>완료된 말씀이 아직 없어요</h2>' +
+      '<p>동그라미 10개를 모두 채우면<br>이곳으로 옮겨져요.</p>' +
+      '<button class="btn ghost" data-action="seg" data-seg="todo">진행중 보기</button>' +
+    '</div>';
+  }
+
+  function emptyTodoHTML() {
+    return '<div class="empty">' +
+      '<div class="empty-mark">✦</div>' +
+      '<h2>진행중인 말씀이 없어요</h2>' +
+      '<p>모두 <b>10회</b>를 채웠어요. 수고했어요!<br>완료 탭에서 볼 수 있어요.</p>' +
+      '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
+      '<button class="btn ghost" data-action="seg" data-seg="done">완료 보기</button>' +
+      '<button class="btn primary" data-action="add-item">말씀 추가</button></div>' +
     '</div>';
   }
 
@@ -657,7 +810,12 @@
       el.innerHTML = emptyHTML();
       return;
     }
-    el.innerHTML = cat.items.map(cardHTML).join('');
+    var items = currentItems();
+    if (!items.length) {
+      el.innerHTML = state.seg === 'done' ? emptyDoneHTML() : emptyTodoHTML();
+      return;
+    }
+    el.innerHTML = items.map(cardHTML).join('');
   }
 
   /* ---------- 상세 ---------- */
@@ -674,10 +832,16 @@
     $('#detailTitle').value = it.title;
     $('#coreInput').value = it.core;
     $('#insightInput').value = it.insight;
+    acc = { core: false, insight: false };
+    setAcc('core', false);
+    setAcc('insight', false);
+    renderAccPeek();
     renderDetailDots(it);
     renderDetailMeta(it, f.category);
-    autoSize($('#coreInput'));
-    autoSize($('#insightInput'));
+    setTimeout(function () {
+      autoSize($('#coreInput'));
+      autoSize($('#insightInput'));
+    }, 30);
     $('#savedHint').textContent = '입력하면 자동으로 저장돼요';
     $('#savedHint').classList.remove('active');
     window.scrollTo(0, 0);
@@ -706,6 +870,42 @@
     $('#detailMeta').innerHTML = parts.join('');
   }
 
+  /* ---------- 핵심내용 · 깨달은 거 접기/펴기 ---------- */
+  function accEl(name) { return document.querySelector('.acc[data-acc="' + name + '"]'); }
+  function accInput(name) { return name === 'core' ? $('#coreInput') : $('#insightInput'); }
+
+  function setAcc(name, open) {
+    acc[name] = !!open;
+    var el = accEl(name);
+    if (!el) return;
+    el.classList.toggle('open', !!open);
+    var head = el.querySelector('.acc-head');
+    if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      // 펼친 뒤에 높이를 다시 계산해야 긴 글이 잘리지 않아요
+      setTimeout(function () { autoSize(accInput(name)); }, 30);
+    }
+  }
+
+  function toggleAcc(name) {
+    setAcc(name, !acc[name]);
+    var el = accEl(name);
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function renderAccPeek() {
+    ['core', 'insight'].forEach(function (name) {
+      var el = accEl(name);
+      var ta = accInput(name);
+      if (!el || !ta) return;
+      var peek = el.querySelector('[data-peek]');
+      if (!peek) return;
+      var txt = String(ta.value || '').replace(/\s+/g, ' ').trim();
+      peek.textContent = txt ? txt.slice(0, 80) : (ta.getAttribute('placeholder') || '');
+      peek.classList.toggle('filled', !!txt);
+    });
+  }
+
   function goBack() {
     if (view.name !== 'detail') return;
     var f = findItem(view.id);
@@ -731,18 +931,47 @@
     if (n <= prev) it.count = n - 1;   // 채워진 동그라미를 누르면 그 지점부터 취소
     else it.count = n;                 // 빈 동그라미를 누르면 그 지점까지 채움
 
-    if (it.count >= TOTAL && prev < TOTAL) {
+    var wasDone = prev >= TOTAL;
+    var nowDone = it.count >= TOTAL;
+
+    if (nowDone && !wasDone) {
       it.completedAt = nowIso();
       buzz([12, 40, 16]);
-      showToast('10회 상고를 모두 채웠어요. 수고했어요!');
     } else {
-      if (it.count < TOTAL) it.completedAt = null;
+      if (!nowDone) it.completedAt = null;
       buzz(8);
     }
     save();
-    syncItemUI(it, it.count);
     renderTabs();
+    renderSeg();
     renderSummary();
+
+    if (view.name === 'detail' && view.id === it.id) {
+      renderDetailDots(it);
+      renderDetailMeta(it, f.category);
+    }
+
+    var belongs = state.seg === 'done' ? nowDone : !nowDone;
+
+    if (view.name === 'list' && !belongs) {
+      // 지금 보고 있는 목록(진행중/완료)에서 빠져나가는 카드는 부드럽게 지우고 다시 그린다
+      var card = document.querySelector('#list .card[data-id="' + it.id + '"]');
+      if (card) {
+        card.classList.add('leaving');
+        setTimeout(function () { renderList(); }, 220);
+      } else {
+        renderList();
+      }
+      if (nowDone) {
+        showToast('10회 상고를 모두 채웠어요. 수고했어요!', '완료 탭 보기', function () { setSeg('done'); }, 5000);
+      } else {
+        showToast('진행중으로 되돌렸어요', '진행중 보기', function () { setSeg('todo'); }, 5000);
+      }
+      return;
+    }
+
+    syncItemUI(it, it.count);
+    if (nowDone && !wasDone) showToast('10회 상고를 모두 채웠어요. 수고했어요!');
   }
 
   function syncItemUI(it, popAt) {
@@ -763,6 +992,119 @@
       var f = findItem(it.id);
       if (f) renderDetailMeta(it, f.category);
     }
+  }
+
+  /* ---------- 드래그로 순서 바꾸기 ---------- */
+  var drag = null;
+
+  function onHandleDown(e) {
+    var handle = e.target.closest ? e.target.closest('.drag-handle') : null;
+    if (!handle) return;
+    var card = handle.closest('.card');
+    if (!card || !card.parentNode) return;
+    e.preventDefault();
+    drag = {
+      id: card.dataset.id,
+      el: card,
+      startY: e.clientY,
+      lastY: e.clientY,
+      active: false,
+      timer: null
+    };
+    try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+    document.addEventListener('pointermove', onDragMove, { passive: false });
+    document.addEventListener('pointerup', onDragEnd);
+    document.addEventListener('pointercancel', onDragEnd);
+  }
+
+  function onDragMove(e) {
+    if (!drag) return;
+    var y = e.clientY;
+    drag.lastY = y;
+    if (!drag.active) {
+      if (Math.abs(y - drag.startY) < 5) return;
+      drag.active = true;
+      drag.el.classList.add('dragging');
+      document.body.classList.add('is-dragging');
+      buzz(8);
+      drag.timer = setInterval(function () {
+        if (drag && drag.active) autoScroll(drag.lastY);
+      }, 60);
+    }
+    e.preventDefault();
+    positionDrag(y);
+    autoScroll(y);
+  }
+
+  function positionDrag(y) {
+    var list = $('#list');
+    if (!list) return;
+    var cards = Array.prototype.slice.call(list.querySelectorAll('.card')).filter(function (c) {
+      return c !== drag.el;
+    });
+    if (!cards.length) return;
+    var ref = null;
+    for (var i = 0; i < cards.length; i++) {
+      var r = cards[i].getBoundingClientRect();
+      if (y < r.top + r.height / 2 - 3) { ref = cards[i]; break; }
+    }
+    if (ref) {
+      if (ref.previousElementSibling !== drag.el) list.insertBefore(drag.el, ref);
+    } else if (list.lastElementChild !== drag.el) {
+      list.appendChild(drag.el);
+    }
+  }
+
+  function autoScroll(y) {
+    var margin = 90;
+    var vh = window.innerHeight || document.documentElement.clientHeight;
+    var step = 0;
+    if (y < margin) step = -Math.min(16, 4 + (margin - y) / 5);
+    else if (y > vh - margin) step = Math.min(16, 4 + (y - (vh - margin)) / 5);
+    if (step) window.scrollBy(0, step);
+  }
+
+  function onDragEnd() {
+    document.removeEventListener('pointermove', onDragMove);
+    document.removeEventListener('pointerup', onDragEnd);
+    document.removeEventListener('pointercancel', onDragEnd);
+    if (!drag) return;
+    var d = drag;
+    drag = null;
+    clearInterval(d.timer);
+    d.el.classList.remove('dragging');
+    document.body.classList.remove('is-dragging');
+    if (!d.active) return;
+    commitOrder();
+    buzz(10);
+  }
+
+  // 화면에 보이는 순서를 그대로 저장한다.
+  // 보이지 않는 항목(다른 탭의 말씀)은 원래 자리를 지킨다.
+  function commitOrder() {
+    var list = $('#list');
+    var cat = activeCategory();
+    var newOrder = Array.prototype.map.call(list.querySelectorAll('.card'), function (c) {
+      return c.dataset.id;
+    });
+    if (!newOrder.length) return;
+    var byId = {};
+    cat.items.forEach(function (it) { byId[it.id] = it; });
+    var visible = {};
+    newOrder.forEach(function (id) { visible[id] = true; });
+    var k = 0;
+    cat.items = cat.items.map(function (it) {
+      if (it && visible[it.id] && byId[newOrder[k]]) return byId[newOrder[k++]];
+      return it;
+    });
+    save();
+    renderTabs();
+    renderSeg();
+    renderSummary();
+    Array.prototype.forEach.call(list.querySelectorAll('.card'), function (c, i) {
+      var idx = c.querySelector('.idx');
+      if (idx) idx.textContent = i + 1;
+    });
   }
 
   /* ---------- 시트/모달 ---------- */
@@ -1201,8 +1543,13 @@
         if (!f) return;
         f.item[field] = e.target.value;
         autoSize(e.target);
+        renderAccPeek();
         scheduleSave();
       });
+    });
+    document.addEventListener('pointerdown', onHandleDown);
+    document.addEventListener('dragstart', function (e) {
+      if (e.target.closest && e.target.closest('.drag-handle')) e.preventDefault();
     });
     $('#overlay').addEventListener('click', function (e) {
       if (e.target === $('#overlay')) closeSheet();
@@ -1243,6 +1590,10 @@
       openSettings();
     } else if (action === 'tab') {
       onTab(el.dataset.id);
+    } else if (action === 'seg') {
+      setSeg(el.dataset.seg);
+    } else if (action === 'acc') {
+      toggleAcc(el.dataset.acc);
     } else if (action === 'add-cat') {
       addCategory();
     } else if (action === 'add-item') {
