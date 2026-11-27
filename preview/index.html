@@ -223,6 +223,13 @@
   .dots.big .dot{font-size:13px}
   .dots.dense{gap:6px}
   .dots.dense .dot{font-size:10.5px;border-width:1px}
+  /* 카드 안의 작은 동그라미: 기본 10개가 한 줄에 들어간다 */
+  .dots.card-dots{
+    grid-template-columns:repeat(10,1fr);
+    gap:5px;max-width:100%;margin:12px 0 0;
+  }
+  .dots.card-dots .dot{font-size:10.5px;border-width:1px}
+  .dots.card-dots .dot.on{box-shadow:0 2px 6px rgba(0,0,0,.14)}
 
   /* 목표 횟수 조절 */
   .target-row{
@@ -855,8 +862,7 @@
         '</button>' +
         handle +
       '</div>' +
-      (done ? '' : '<div class="dots' + (dotCols(targetOf(it)) >= 8 ? ' dense' : '') +
-        '" data-dots style="' + dotsStyle(it.target, 270) + '">' +
+      (done ? '' : '<div class="dots card-dots" data-dots>' +
         dotsHTML(it.count, it.target) + '</div>') +
     '</article>';
   }
@@ -1134,8 +1140,6 @@
       card.classList.toggle('done', done);
       var dots = card.querySelector('[data-dots]');
       if (dots) {
-        dots.setAttribute('style', dotsStyle(t, 270));
-        dots.classList.toggle('dense', dotCols(t) >= 8);
         dots.innerHTML = dotsHTML(it.count, t, popAt);
       }
       var badge = card.querySelector('[data-progress]');
