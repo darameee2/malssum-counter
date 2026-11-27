@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="말씀 상고">
-<title>말씀 상고 · 10회</title>
+<title>말씀 상고</title>
 <style>
   :root{
     --bg:#0e1116;
@@ -221,6 +221,43 @@
   .dot.pop{animation:dotPop .32s cubic-bezier(.2,1.4,.4,1)}
   @keyframes dotPop{0%{transform:scale(.72)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
   .dots.big .dot{font-size:13px}
+  .dots.dense{gap:6px}
+  .dots.dense .dot{font-size:10.5px;border-width:1px}
+  /* 카드 안의 작은 동그라미: 기본 10개가 한 줄에 들어간다 */
+  .dots.card-dots{
+    grid-template-columns:repeat(10,1fr);
+    gap:5px;max-width:100%;margin:12px 0 0;
+  }
+  .dots.card-dots .dot{font-size:10.5px;border-width:1px}
+  .dots.card-dots .dot.on{box-shadow:0 2px 6px rgba(0,0,0,.14)}
+
+  /* 목표 횟수 조절 */
+  .target-row{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    margin-top:14px;padding-top:14px;border-top:1px solid var(--line);
+  }
+  .target-row.top{margin-top:14px;padding-top:0;border-top:0}
+  .target-label{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.02em}
+  .sheet .target-row .target-label{font-size:14.5px;color:var(--text)}
+  .stepper{display:flex;align-items:center;gap:6px}
+  .step-btn{
+    width:40px;height:40px;flex:none;border-radius:12px;
+    border:1px solid var(--line);background:var(--card-2);color:var(--text);
+    font-size:19px;font-weight:800;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform .1s, border-color .15s;
+  }
+  .step-btn:active{transform:scale(.94);border-color:var(--accent)}
+  .target-input{
+    width:62px;height:40px;text-align:center;
+    border:1px solid var(--line);border-radius:12px;
+    background:var(--card-2);color:var(--text);
+    font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;
+    -moz-appearance:textfield;appearance:textfield;
+  }
+  .target-input::-webkit-outer-spin-button,.target-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .target-input:focus{outline:none;border-color:var(--accent);background:var(--card)}
+  .target-suffix{font-size:13px;color:var(--muted);font-weight:700}
 
   /* empty */
   .empty{text-align:center;padding:52px 24px 32px;color:var(--muted)}
@@ -417,7 +454,7 @@
           <div class="brand-mark">✦</div>
           <div style="min-width:0">
             <h1>말씀 상고</h1>
-            <p>한 말씀을 열 번, 마음에 새기기</p>
+            <p>한 말씀을 정한 횟수만큼, 마음에 새기기</p>
           </div>
         </div>
         <div class="topbar-actions">
@@ -469,6 +506,15 @@
           <span class="label">상고 진행</span>
           <span class="value" id="detailProgress">0 / 10</span>
         </div>
+        <div class="target-row">
+          <span class="target-label">목표 횟수</span>
+          <div class="stepper">
+            <button class="step-btn" type="button" data-action="target-step" data-step="-1" aria-label="목표 횟수 줄이기">−</button>
+            <input class="target-input" id="targetInput" type="number" inputmode="numeric" min="1" max="100" value="10" aria-label="목표 횟수">
+            <span class="target-suffix">회</span>
+            <button class="step-btn" type="button" data-action="target-step" data-step="1" aria-label="목표 횟수 늘리기">+</button>
+          </div>
+        </div>
         <div class="dots big" id="detailDots"></div>
         <p class="progress-hint" id="detailHint"></p>
       </div>
@@ -517,7 +563,9 @@
   'use strict';
 
   var KEY = 'malssum-counter-v1';
-  var TOTAL = 10;
+  var DEFAULT_TARGET = 10;
+  var MIN_TARGET = 1;
+  var MAX_TARGET = 100;
   var state = null;
   var view = { name: 'list', id: null };
   var acc = { core: false, insight: false };
@@ -550,6 +598,14 @@
   function buzz(p) {
     try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
   }
+  function clampTarget(v, fallback) {
+    var n = parseInt(v, 10);
+    if (isNaN(n)) n = (fallback == null ? DEFAULT_TARGET : fallback);
+    if (n < MIN_TARGET) n = MIN_TARGET;
+    if (n > MAX_TARGET) n = MAX_TARGET;
+    return n;
+  }
+  function targetOf(it) { return clampTarget(it && it.target, DEFAULT_TARGET); }
 
   /* ---------- 데이터 ---------- */
   function defaultState() {
@@ -565,12 +621,15 @@
       c = c || {};
       var items = Array.isArray(c.items) ? c.items.map(function (it) {
         it = it || {};
+        // 목표 횟수를 저장하지 않던 예전 기록은 기본 10회로 읽는다
+        var target = clampTarget(it.target, DEFAULT_TARGET);
         var count = parseInt(it.count, 10);
         if (isNaN(count) || count < 0) count = 0;
-        if (count > TOTAL) count = TOTAL;
+        if (count > target) count = target;
         return {
           id: (typeof it.id === 'string' && it.id) ? it.id : uid(),
           title: (typeof it.title === 'string' && it.title.trim()) ? it.title : '제목 없음',
+          target: target,
           count: count,
           core: typeof it.core === 'string' ? it.core : '',
           insight: typeof it.insight === 'string' ? it.insight : '',
@@ -671,7 +730,7 @@
     renderList();
   }
 
-  function isDone(it) { return it.count >= TOTAL; }
+  function isDone(it) { return it.count >= targetOf(it); }
 
   function splitItems(cat) {
     var todo = [], done = [];
@@ -713,7 +772,7 @@
   function renderTabs() {
     var el = $('#tabs');
     var html = state.categories.map(function (c) {
-      var doneCount = c.items.filter(function (i) { return i.count >= TOTAL; }).length;
+      var doneCount = c.items.filter(isDone).length;
       var badge = c.items.length
         ? '<span class="tab-count">' + doneCount + '/' + c.items.length + '</span>'
         : '';
@@ -735,16 +794,37 @@
     var s = splitItems(cat);
     if (state.seg === 'done') {
       el.innerHTML = '<span><b>' + esc(cat.name) + '</b> · 완료 <b>' + s.done.length +
-        '</b>개 · 10개를 모두 채우면 이곳으로 옮겨져요</span>';
+        '</b>개 · 목표를 모두 채우면 이곳으로 옮겨져요</span>';
       return;
     }
     el.innerHTML = '<span><b>' + esc(cat.name) + '</b> · 말씀 ' + cat.items.length +
       '개 · 진행중 <b>' + s.todo.length + '</b> · 완료 <b>' + s.done.length + '</b></span>';
   }
 
-  function dotsHTML(count, popAt) {
+  // 목표 횟수에 맞춰 동그라미 줄 수를 정한다 (10회는 기존처럼 5칸 × 2줄)
+  function dotCols(n) {
+    if (n <= 10) return 5;
+    if (n <= 30) {
+      var best = 5, bestLeft = 99;
+      for (var c = 5; c <= 7; c++) {
+        var left = (c - (n % c)) % c;
+        if (left < bestLeft) { bestLeft = left; best = c; }
+      }
+      return best;
+    }
+    return 10;
+  }
+
+  function dotsStyle(target, maxWidth) {
+    var cols = dotCols(targetOf({ target: target }));
+    var w = cols >= 7 ? Math.max(maxWidth || 270, 300) : (maxWidth || 270);
+    return 'grid-template-columns:repeat(' + cols + ',1fr);max-width:' + w + 'px';
+  }
+
+  function dotsHTML(count, target, popAt) {
+    var total = targetOf({ target: target });
     var out = '';
-    for (var i = 1; i <= TOTAL; i++) {
+    for (var i = 1; i <= total; i++) {
       var on = i <= count;
       out += '<button class="dot' + (on ? ' on' : '') + (popAt === i ? ' pop' : '') +
         '" data-action="dot" data-n="' + i + '" aria-label="' + i + '회' +
@@ -754,10 +834,14 @@
     return out;
   }
 
+  function badgeText(it) {
+    var t = targetOf(it);
+    return it.count >= t ? t + '/' + t + ' 완료' : it.count + '/' + t;
+  }
+
   function badgeHTML(it) {
-    return it.count >= TOTAL
-      ? '<span class="badge done" data-progress>10/10 완료</span>'
-      : '<span class="badge" data-progress>' + it.count + '/10</span>';
+    return '<span class="badge' + (isDone(it) ? ' done' : '') + '" data-progress>' +
+      badgeText(it) + '</span>';
   }
 
   function cardHTML(it, idx) {
@@ -778,7 +862,8 @@
         '</button>' +
         handle +
       '</div>' +
-      (done ? '' : '<div class="dots" data-dots>' + dotsHTML(it.count) + '</div>') +
+      (done ? '' : '<div class="dots card-dots" data-dots>' +
+        dotsHTML(it.count, it.target) + '</div>') +
     '</article>';
   }
 
@@ -792,7 +877,8 @@
       '· 상단 탭을 눌러 카테고리를 바꾸고, <b>＋</b>로 새 카테고리를 만들어요.<br>' +
       '· 탭을 한 번 더 누르면 이름 바꾸기·삭제를 할 수 있어요.<br>' +
       '· 동그라미를 터치할 때마다 한 번씩 채워지고, 다시 누르면 취소돼요.<br>' +
-      '· 10개를 다 채우면 <b>완료</b>로 옮겨져요.<br>' +
+      '· 말씀마다 목표 횟수를 정할 수 있어요(기본 10회, 1~100회).<br>' +
+      '· 목표를 다 채우면 <b>완료</b>로 옮겨져요.<br>' +
       '· 카드 오른쪽 <b>⋮⋮</b>를 잡고 위아래로 옮기면 순서를 바꿀 수 있어요.<br>' +
       '· 제목을 누르면 핵심내용·깨달은 거를 적는 화면으로 넘어가요.</div>' +
     '</div>';
@@ -802,7 +888,7 @@
     return '<div class="empty">' +
       '<div class="empty-mark">✓</div>' +
       '<h2>완료된 말씀이 아직 없어요</h2>' +
-      '<p>동그라미 10개를 모두 채우면<br>이곳으로 옮겨져요.</p>' +
+      '<p>동그라미를 목표 횟수만큼 다 채우면<br>이곳으로 옮겨져요.</p>' +
       '<button class="btn ghost" data-action="seg" data-seg="todo">진행중 보기</button>' +
     '</div>';
   }
@@ -811,7 +897,7 @@
     return '<div class="empty">' +
       '<div class="empty-mark">✦</div>' +
       '<h2>진행중인 말씀이 없어요</h2>' +
-      '<p>모두 <b>10회</b>를 채웠어요. 수고했어요!<br>완료 탭에서 볼 수 있어요.</p>' +
+      '<p>모두 <b>목표 횟수</b>를 채웠어요. 수고했어요!<br>완료 탭에서 볼 수 있어요.</p>' +
       '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
       '<button class="btn ghost" data-action="seg" data-seg="done">완료 보기</button>' +
       '<button class="btn primary" data-action="add-item">말씀 추가</button></div>' +
@@ -863,14 +949,70 @@
   }
 
   function renderDetailDots(it) {
-    $('#detailDots').innerHTML = dotsHTML(it.count);
-    $('#detailProgress').textContent = it.count + ' / ' + TOTAL;
+    var t = targetOf(it);
+    var dots = $('#detailDots');
+    dots.setAttribute('style', dotsStyle(t, 322));
+    dots.classList.toggle('dense', dotCols(t) >= 8);
+    dots.innerHTML = dotsHTML(it.count, t);
+    $('#detailProgress').textContent = it.count + ' / ' + t;
     var card = $('#progressCard');
-    card.classList.toggle('done', it.count >= TOTAL);
+    card.classList.toggle('done', it.count >= t);
     var hint = $('#detailHint');
-    if (it.count >= TOTAL) hint.textContent = '10회 상고 완료! 이 말씀을 다 새겼어요';
+    if (it.count >= t) hint.textContent = t + '회 상고 완료! 이 말씀을 다 새겼어요';
     else if (it.count === 0) hint.textContent = '동그라미를 터치할 때마다 한 번씩 채워져요';
-    else hint.textContent = (TOTAL - it.count) + '번 더 상고하면 완료예요';
+    else hint.textContent = (t - it.count) + '번 더 상고하면 완료예요';
+    renderTargetControl(it);
+  }
+
+  function renderTargetControl(it) {
+    var input = $('#targetInput');
+    if (!input) return;
+    if (document.activeElement !== input) input.value = targetOf(it);
+  }
+
+  // 목표 횟수 변경: 숫자를 바꾸면 동그라미 개수와 완료 여부가 함께 바뀐다
+  function applyTarget(it, raw) {
+    var f = findItem(it.id);
+    if (!f) return;
+    var before = targetOf(it);
+    var t = clampTarget(raw, before);
+    if (it.target === t) { renderTargetControl(it); return; }
+    var prevDone = it.count >= before;
+    it.target = t;
+    if (it.count > t) it.count = t;   // 목표보다 많이 채운 상태면 목표에 맞춘다
+    var nowDone = it.count >= t;
+    if (nowDone && !prevDone) {
+      it.completedAt = it.completedAt || nowIso();
+    } else if (!nowDone) {
+      it.completedAt = null;
+    }
+    save();
+    renderTabs();
+    renderSeg();
+    renderSummary();
+    renderDetailDots(it);
+    renderDetailMeta(it, f.category);
+    if (view.name === 'list') renderList();
+
+    if (prevDone !== nowDone) {
+      buzz([12, 40, 16]);
+      showToast(nowDone
+        ? '목표 ' + t + '회를 모두 채웠어요. 완료로 옮겼어요.'
+        : '목표를 ' + t + '회로 늘렸어요. 진행중으로 돌아왔어요.',
+        nowDone ? '완료 보기' : '진행중 보기',
+        function () { goBack(); setSeg(nowDone ? 'done' : 'todo'); }, 5000);
+    } else {
+      buzz(8);
+      showToast('목표를 ' + t + '회로 바꿨어요');
+    }
+  }
+
+  function stepTarget(delta) {
+    var f = findItem(view.id);
+    if (!f) return;
+    var cur = clampTarget($('#targetInput').value, targetOf(f.item));
+    applyTarget(f.item, cur + delta);
+    $('#targetInput').value = targetOf(f.item);
   }
 
   function renderDetailMeta(it, cat) {
@@ -942,12 +1084,13 @@
     var f = findItem(id);
     if (!f) return;
     var it = f.item;
+    var t = targetOf(it);
     var prev = it.count;
     if (n <= prev) it.count = n - 1;   // 채워진 동그라미를 누르면 그 지점부터 취소
     else it.count = n;                 // 빈 동그라미를 누르면 그 지점까지 채움
 
-    var wasDone = prev >= TOTAL;
-    var nowDone = it.count >= TOTAL;
+    var wasDone = prev >= t;
+    var nowDone = it.count >= t;
 
     if (nowDone && !wasDone) {
       it.completedAt = nowIso();
@@ -978,7 +1121,7 @@
         renderList();
       }
       if (nowDone) {
-        showToast('10회 상고를 모두 채웠어요. 수고했어요!', '완료 탭 보기', function () { setSeg('done'); }, 5000);
+        showToast(t + '회 상고를 모두 채웠어요. 수고했어요!', '완료 탭 보기', function () { setSeg('done'); }, 5000);
       } else {
         showToast('진행중으로 되돌렸어요', '진행중 보기', function () { setSeg('todo'); }, 5000);
       }
@@ -986,20 +1129,23 @@
     }
 
     syncItemUI(it, it.count);
-    if (nowDone && !wasDone) showToast('10회 상고를 모두 채웠어요. 수고했어요!');
+    if (nowDone && !wasDone) showToast(t + '회 상고를 모두 채웠어요. 수고했어요!');
   }
 
   function syncItemUI(it, popAt) {
     var card = document.querySelector('.card[data-id="' + it.id + '"]');
     if (card) {
-      var done = it.count >= TOTAL;
+      var t = targetOf(it);
+      var done = it.count >= t;
       card.classList.toggle('done', done);
       var dots = card.querySelector('[data-dots]');
-      if (dots) dots.innerHTML = dotsHTML(it.count, popAt);
+      if (dots) {
+        dots.innerHTML = dotsHTML(it.count, t, popAt);
+      }
       var badge = card.querySelector('[data-progress]');
       if (badge) {
         badge.className = 'badge' + (done ? ' done' : '');
-        badge.textContent = done ? '10/10 완료' : it.count + '/10';
+        badge.textContent = badgeText(it);
       }
     }
     if (view.name === 'detail' && view.id === it.id) {
@@ -1390,15 +1536,36 @@
   /* ---------- 말씀 ---------- */
   function addItem() {
     var cat = activeCategory();
-    askText({
-      title: '새 말씀',
-      message: '「' + cat.name + '」에 추가합니다',
-      placeholder: '예: 시편 23편, 요한복음 3:16',
-      confirmText: '추가'
-    }).then(function (title) {
-      if (!title) return;
+    openSheet(
+      '<div class="sheet-head"><h2>새 말씀</h2>' +
+      '<p>「' + esc(cat.name) + '」에 추가합니다</p></div>' +
+      '<input class="sheet-input" id="newTitle" type="text" placeholder="예: 시편 23편, 요한복음 3:16"' +
+      ' maxlength="80" autocomplete="off" spellcheck="false">' +
+      '<div class="target-row top">' +
+        '<span class="target-label">목표 횟수</span>' +
+        '<div class="stepper">' +
+          '<button class="step-btn" type="button" data-c="dec" aria-label="목표 횟수 줄이기">−</button>' +
+          '<input class="target-input" id="newTarget" type="number" inputmode="numeric" min="' + MIN_TARGET +
+            '" max="' + MAX_TARGET + '" value="' + DEFAULT_TARGET + '" aria-label="목표 횟수">' +
+          '<span class="target-suffix">회</span>' +
+          '<button class="step-btn" type="button" data-c="inc" aria-label="목표 횟수 늘리기">+</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="sheet-actions">' +
+        '<button class="btn ghost" data-c="0">취소</button>' +
+        '<button class="btn primary" data-c="1">추가</button>' +
+      '</div>'
+    );
+    var titleInput = $('#newTitle');
+    var targetInput = $('#newTarget');
+
+    function doAdd() {
+      var title = titleInput.value.trim();
+      if (!title) { titleInput.focus(); return; }
+      var t = clampTarget(targetInput.value, DEFAULT_TARGET);
+      closeSheet();
       var it = {
-        id: uid(), title: title, count: 0, core: '', insight: '',
+        id: uid(), title: title, target: t, count: 0, core: '', insight: '',
         createdAt: nowIso(), completedAt: null
       };
       activeCategory().items.unshift(it);
@@ -1409,7 +1576,24 @@
         card.classList.add('new');
         try { card.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
       }
+      showToast('「' + title + '」 · 목표 ' + t + '회로 추가했어요');
+    }
+
+    $('#sheet').onclick = function (e) {
+      var b = e.target.closest('[data-c]');
+      if (!b) return;
+      var c = b.dataset.c;
+      if (c === '0') { closeSheet(); return; }
+      if (c === '1') { doAdd(); return; }
+      var cur = clampTarget(targetInput.value, DEFAULT_TARGET);
+      targetInput.value = clampTarget(cur + (c === 'inc' ? 1 : -1), DEFAULT_TARGET);
+    };
+    titleInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); doAdd(); }
     });
+    setTimeout(function () {
+      try { titleInput.focus(); } catch (e) {}
+    }, 80);
   }
 
   function deleteCurrentItem() {
@@ -1457,8 +1641,8 @@
     var cat = activeCategory();
     openSheet(
       '<div class="sheet-head"><h2>' + esc(cat.name) + '</h2>' +
-      '<p>말씀 ' + cat.items.length + '개 · 10회 완료 ' +
-      cat.items.filter(function (i) { return i.count >= TOTAL; }).length + '개</p></div>' +
+      '<p>말씀 ' + cat.items.length + '개 · 완료 ' +
+      cat.items.filter(isDone).length + '개</p></div>' +
       '<div class="sheet-list">' +
       '<button class="sheet-row" data-s="rename"><span>이름 바꾸기</span><span class="row-sub">✎</span></button>' +
       '<button class="sheet-row" data-s="add"><span>이 카테고리에 말씀 추가</span><span class="row-sub">＋</span></button>' +
@@ -1713,6 +1897,20 @@
         scheduleSave();
       });
     });
+    var targetInput = $('#targetInput');
+    if (targetInput) {
+      targetInput.addEventListener('change', function (e) {
+        var f = findItem(view.id);
+        if (!f) return;
+        applyTarget(f.item, e.target.value);
+      });
+      targetInput.addEventListener('blur', function (e) {
+        var f = findItem(view.id);
+        if (!f) return;
+        applyTarget(f.item, e.target.value);
+        e.target.value = targetOf(f.item);
+      });
+    }
     document.addEventListener('pointerdown', onHandleDown);
     document.addEventListener('dragstart', function (e) {
       if (e.target.closest && e.target.closest('.drag-handle')) e.preventDefault();
@@ -1775,6 +1973,8 @@
       else goBack();
     } else if (action === 'delete-item') {
       deleteCurrentItem();
+    } else if (action === 'target-step') {
+      stepTarget(parseInt(el.dataset.step, 10) || 1);
     }
   });
 
